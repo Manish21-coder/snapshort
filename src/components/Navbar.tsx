@@ -7,8 +7,8 @@ import { useUser, SignInButton, SignOutButton } from "@clerk/nextjs";
 export default function Navbar() {
   const { user } = useUser(); // logged-in user info
 
-  // Get profile image safely
-  const profileImageUrl = user?.profileImage?.getThumbnailUrl();
+  // Clerk v6+: profile image URL is user.imageUrl
+  const profileImageUrl = user?.imageUrl;
 
   return (
     <div className="sticky top-4 z-50 flex justify-center">
@@ -24,8 +24,12 @@ export default function Navbar() {
 
         {/* Links */}
         <div className="flex items-center gap-6 text-gray-200">
-          <Link href="/" className="hover:text-white transition">Home</Link>
-          <Link href="/dashboard" className="hover:text-white transition">Dashboard</Link>
+          <Link href="/" className="hover:text-white transition">
+            Home
+          </Link>
+          <Link href="/dashboard" className="hover:text-white transition">
+            Dashboard
+          </Link>
           <Link
             href="/"
             className="bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2 rounded-lg text-white font-medium hover:scale-105 transition"
@@ -43,7 +47,7 @@ export default function Navbar() {
                   className="w-8 h-8 rounded-full"
                 />
               )}
-              <span>{user.firstName || user.fullName}</span>
+              <span>{user.firstName || user.fullName || "User"}</span>
               <SignOutButton>
                 <button className="px-3 py-1 bg-red-500 rounded text-white hover:bg-red-600 transition">
                   Logout

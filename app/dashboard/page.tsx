@@ -76,7 +76,7 @@ export default function Dashboard() {
         
 
         {/* 🔍 Search + Filters */}
-        <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
+        <div className="backdrop-blur-lg bg-white border border-white/20 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
 
           <input
             type="text"
