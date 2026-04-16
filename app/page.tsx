@@ -215,7 +215,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-6xl font-extrabold mb-4 leading-tight"
+            className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-4 leading-tight"
           >
             Shorten Links
             <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
@@ -538,7 +538,7 @@ export default function Home() {
           {...fadeUpProps()}
           className="max-w-2xl mx-auto text-center relative z-10"
         >
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-6 leading-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6 leading-tight">
             Ready to shorten
             <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
               {" "}your first link?
@@ -585,10 +585,7 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="py-10 px-6 border-t border-white/5 text-center">
-        <p className="text-gray-600 text-sm">Built with ❤️ by Manish</p>
-      </footer>
+      {/* Footer is rendered globally by app/layout.tsx */}
     </main>
   );
 }

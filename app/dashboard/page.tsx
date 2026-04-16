@@ -141,7 +141,7 @@ export default function Dashboard() {
       <div className="absolute w-[500px] h-[500px] bg-blue-500 rounded-full blur-[200px] opacity-30 animate-pulse bottom-[-100px] right-[-100px]"></div>
 
       <div className="relative z-10 max-w-5xl mx-auto pt-10 px-4 pb-16">
-        <h1 className="text-4xl font-bold mb-6">Dashboard</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-6">Dashboard</h1>
 
         {/* Search + Filters */}
         <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
@@ -156,17 +156,17 @@ export default function Dashboard() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="p-2 rounded-lg text-black"
+            className="w-full md:w-auto min-h-[44px] p-3 rounded-lg text-black"
           />
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="p-2 rounded-lg text-black"
+            className="w-full md:w-auto min-h-[44px] p-3 rounded-lg text-black"
           />
           <button
             onClick={fetchLinks}
-            className="bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2 rounded-lg font-medium hover:scale-105 transition"
+            className="min-h-[44px] bg-gradient-to-r from-blue-500 to-purple-500 px-5 py-3 rounded-lg font-medium hover:scale-105 transition"
           >
             Apply
           </button>
@@ -189,10 +189,10 @@ export default function Dashboard() {
                   <motion.div
                     key={link._id}
                     whileHover={{ scale: 1.01 }}
-                    className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-5 flex justify-between items-start gap-4"
+                    className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3"
                   >
                     <div className="flex flex-col gap-1 min-w-0">
-                      <span className="text-gray-300 text-sm truncate max-w-md">
+                      <span className="text-gray-300 text-sm truncate">
                         {link.originalUrl}
                       </span>
 
@@ -205,7 +205,7 @@ export default function Dashboard() {
                       <a
                         href={`${window.location.origin}/${link.shortCode}`}
                         target="_blank"
-                        className="text-blue-400 font-medium"
+                        className="text-blue-400 font-medium text-sm break-all"
                       >
                         {window.location.origin}/{link.shortCode}
                       </a>
@@ -218,11 +218,11 @@ export default function Dashboard() {
                       </a>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 shrink-0">
                       <p className="text-sm text-gray-400">Clicks: {link.clicks || 0}</p>
                       <button
                         onClick={() => openEdit(link)}
-                        className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg transition"
+                        className="min-h-[44px] sm:min-h-0 text-sm bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-lg transition"
                       >
                         Edit
                       </button>
@@ -294,7 +294,7 @@ export default function Dashboard() {
               />
               <button
                 onClick={addGroupUrl}
-                className="bg-blue-500 hover:bg-blue-600 px-3 rounded-lg text-sm transition"
+                className="min-h-[44px] bg-blue-500 hover:bg-blue-600 px-4 rounded-lg text-sm transition"
               >
                 Add
               </button>
@@ -305,14 +305,14 @@ export default function Dashboard() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setEditingLink(null)}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
+                className="min-h-[44px] px-5 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={saveEdit}
                 disabled={editLoading}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 font-medium hover:scale-105 transition disabled:opacity-50"
+                className="min-h-[44px] px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 font-medium hover:scale-105 transition disabled:opacity-50"
               >
                 {editLoading ? "Saving..." : "Save"}
               </button>

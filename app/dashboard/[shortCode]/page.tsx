@@ -99,11 +99,11 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
       <div className="absolute w-[500px] h-[500px] bg-blue-500 rounded-full blur-[200px] opacity-20 animate-pulse bottom-[-100px] right-[-100px]"></div>
 
       <div className="relative z-10 max-w-5xl mx-auto pt-10 px-4 pb-20">
-        <a href="/dashboard" className="text-gray-400 text-sm hover:text-white mb-6 inline-block">
+        <a href="/dashboard" className="text-gray-400 text-sm hover:text-white mb-6 inline-flex items-center min-h-[44px]">
           ← Back to Dashboard
         </a>
 
-        <h1 className="text-3xl font-bold mb-2">Analytics</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Analytics</h1>
 
         {/* Link Info */}
         <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-5 mb-6">
