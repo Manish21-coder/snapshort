@@ -8,6 +8,7 @@ import { useUser, SignInButton, SignOutButton } from "@clerk/nextjs";
 const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/utm", label: "UTM Generator" },
 ];
 
 export default function Navbar() {
