@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, SignInButton } from "@clerk/nextjs";
 
@@ -266,6 +267,7 @@ function Field({
 
 export default function UTMGeneratorPage() {
   const { isSignedIn, isLoaded } = useUser();
+  const router = useRouter();
 
   // Form state
   const [baseUrl, setBaseUrl]     = useState("");
@@ -281,11 +283,8 @@ export default function UTMGeneratorPage() {
   const [urlError, setUrlError]   = useState("");
 
   // Output state
-  const [copied, setCopied]           = useState(false);
-  const [shortening, setShortening]   = useState(false);
-  const [shortUrl, setShortUrl]       = useState("");
-  const [shortCopied, setShortCopied] = useState(false);
-  const [saving, setSaving]           = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Presets
   const [presets, setPresets]             = useState<Preset[]>([]);
@@ -347,8 +346,6 @@ export default function UTMGeneratorPage() {
     }
   }, [baseUrl]);
 
-  // Reset short URL when generated URL changes
-  useEffect(() => { setShortUrl(""); }, [generatedUrl]);
 
   // ── Custom params ────────────────────────────────────────────────────────────
 
@@ -372,22 +369,11 @@ export default function UTMGeneratorPage() {
   };
 
   // ── Shorten ──────────────────────────────────────────────────────────────────
+  // Navigate to dashboard with the full UTM URL pre-filled in the shortener form.
 
-  const shortenLink = async () => {
+  const goToShorten = () => {
     if (!generatedUrl) return;
-    setShortening(true);
-    try {
-      const res = await fetch("/api/shorten", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ originalUrl: generatedUrl }),
-      });
-      const data = await res.json();
-      if (data.data?.shortCode) {
-        setShortUrl(`${window.location.origin}/${data.data.shortCode}`);
-      }
-    } catch {}
-    setShortening(false);
+    router.push(`/dashboard?url=${encodeURIComponent(generatedUrl)}`);
   };
 
   // ── Save to server history ────────────────────────────────────────────────────
@@ -409,7 +395,7 @@ export default function UTMGeneratorPage() {
           utmParams: { utm_source: source, utm_medium: medium, utm_campaign: campaign, utm_term: term, utm_content: content, utm_id: utmId, coupon },
           customParams: allCustom,
           finalUrl: generatedUrl,
-          shortUrl,
+          shortUrl: "",
         }),
       });
       if (historyTab) fetchHistory();
@@ -443,7 +429,6 @@ export default function UTMGeneratorPage() {
     setUtmId(preset.utmId);
     setCoupon(preset.coupon);
     setCustomParams(preset.customParams.map((cp) => ({ ...cp, id: uid() })));
-    setShortUrl("");
   };
 
   const deletePreset = (name: string) => {
@@ -473,7 +458,6 @@ export default function UTMGeneratorPage() {
         .filter((cp) => cp.key !== "subsource")
         .map((cp) => ({ ...cp, id: uid() }))
     );
-    setShortUrl(item.shortUrl || "");
     setHistoryTab(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -784,11 +768,10 @@ export default function UTMGeneratorPage() {
 
                       {isValid && (
                         <button
-                          onClick={shortenLink}
-                          disabled={shortening}
-                          className="min-h-[40px] px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm transition disabled:opacity-50"
+                          onClick={goToShorten}
+                          className="min-h-[40px] px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm transition"
                         >
-                          {shortening ? "Shortening…" : "Shorten this link"}
+                          Shorten this link →
                         </button>
                       )}
 
@@ -803,27 +786,10 @@ export default function UTMGeneratorPage() {
                       )}
                     </div>
 
-                    {shortUrl && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-4 flex items-center gap-3 bg-green-500/10 border border-green-400/20 rounded-xl p-3"
-                      >
-                        <a
-                          href={shortUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 text-green-300 text-sm font-mono break-all hover:underline"
-                        >
-                          {shortUrl}
-                        </a>
-                        <button
-                          onClick={() => copy(shortUrl, setShortCopied)}
-                          className="shrink-0 px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-xs text-green-300 transition"
-                        >
-                          {shortCopied ? "Copied!" : "Copy"}
-                        </button>
-                      </motion.div>
+                    {isValid && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        Click &ldquo;Shorten this link&rdquo; to customize alias, add to folder, and generate your short link →
+                      </p>
                     )}
                   </>
                 ) : (

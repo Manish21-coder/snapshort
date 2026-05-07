@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useUser, SignInButton } from "@clerk/nextjs";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface LinkDoc {
   _id: string;
@@ -23,6 +24,18 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // UTM shorten panel — activated when ?url= query param is present
+  const [utmPanelUrl, setUtmPanelUrl]         = useState("");
+  const [utmAlias, setUtmAlias]               = useState("");
+  const [utmPrefix, setUtmPrefix]             = useState("");
+  const [utmFolder, setUtmFolder]             = useState("");
+  const [utmNewFolder, setUtmNewFolder]       = useState("");
+  const [showUtmNewFolder, setShowUtmNewFolder] = useState(false);
+  const [utmResult, setUtmResult]             = useState("");
+  const [utmLoading, setUtmLoading]           = useState(false);
+  const [utmError, setUtmError]               = useState("");
+  const [utmCopied, setUtmCopied]             = useState(false);
 
   // Edit modal state
   const [editingLink, setEditingLink] = useState<LinkDoc | null>(null);
@@ -54,6 +67,45 @@ export default function Dashboard() {
       fetchFolders();
     }
   }, [isSignedIn]);
+
+  // Read ?url= param written by UTM Generator and pre-fill the shorten panel
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const incomingUrl = params.get("url");
+    if (incomingUrl) setUtmPanelUrl(incomingUrl);
+  }, []);
+
+  const doShorten = async () => {
+    if (!utmPanelUrl) return;
+    setUtmLoading(true);
+    setUtmError("");
+    try {
+      const res = await fetch("/api/shorten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalUrl: utmPanelUrl,
+          prefix: utmPrefix,
+          alias: utmAlias,
+          folder: showUtmNewFolder ? utmNewFolder.trim() : utmFolder,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setUtmError(data.error || "Failed to shorten"); setUtmLoading(false); return; }
+      if (data?.data?.shortCode) {
+        setUtmResult(`${window.location.origin}/${data.data.shortCode}`);
+        fetchLinks();
+        fetchFolders();
+      }
+    } catch { setUtmError("Request failed"); }
+    setUtmLoading(false);
+  };
+
+  const copyUtmResult = () => {
+    navigator.clipboard.writeText(utmResult);
+    setUtmCopied(true);
+    setTimeout(() => setUtmCopied(false), 2000);
+  };
 
   const openEdit = (link: LinkDoc) => {
     setEditingLink(link);
@@ -142,6 +194,140 @@ export default function Dashboard() {
 
       <div className="relative z-10 max-w-5xl mx-auto pt-10 px-4 pb-16">
         <h1 className="text-3xl sm:text-4xl font-bold mb-6">Dashboard</h1>
+
+        {/* UTM Shorten Panel — shown when arriving from UTM Generator */}
+        {utmPanelUrl && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="backdrop-blur-lg bg-blue-500/10 border border-blue-400/30 rounded-2xl p-5 mb-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-blue-300">Shorten your UTM link</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Customize then click Shorten →</p>
+              </div>
+              <button
+                onClick={() => { setUtmPanelUrl(""); setUtmResult(""); setUtmError(""); }}
+                className="text-gray-500 hover:text-gray-300 text-sm transition"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {/* UTM URL (pre-filled, editable) */}
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">UTM URL</label>
+                <textarea
+                  value={utmPanelUrl}
+                  onChange={(e) => { setUtmPanelUrl(e.target.value); setUtmResult(""); }}
+                  rows={3}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-xs font-mono outline-none resize-none placeholder:text-gray-500 focus:border-blue-400/50 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Custom alias <span className="text-gray-600">(optional)</span></label>
+                  <input
+                    value={utmAlias}
+                    onChange={(e) => setUtmAlias(e.target.value)}
+                    placeholder="e.g. spring-sale"
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-sm outline-none placeholder:text-gray-500 focus:border-blue-400/50 transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Prefix <span className="text-gray-600">(optional)</span></label>
+                  <input
+                    value={utmPrefix}
+                    onChange={(e) => setUtmPrefix(e.target.value)}
+                    placeholder="e.g. mkt"
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-sm outline-none placeholder:text-gray-500 focus:border-blue-400/50 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Folder picker */}
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Folder <span className="text-gray-600">(optional)</span></label>
+                <div className="flex gap-2">
+                  <select
+                    value={showUtmNewFolder ? "__new__" : utmFolder}
+                    onChange={(e) => {
+                      if (e.target.value === "__new__") { setShowUtmNewFolder(true); setUtmFolder(""); }
+                      else { setShowUtmNewFolder(false); setUtmFolder(e.target.value); }
+                    }}
+                    className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-sm outline-none"
+                  >
+                    <option value="" className="bg-gray-900">No folder</option>
+                    {folders.map((f) => (
+                      <option key={f} value={f} className="bg-gray-900">📁 {f}</option>
+                    ))}
+                    <option value="__new__" className="bg-gray-900">+ New folder…</option>
+                  </select>
+                  {showUtmNewFolder && (
+                    <input
+                      value={utmNewFolder}
+                      onChange={(e) => setUtmNewFolder(e.target.value)}
+                      placeholder="Folder name"
+                      className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-sm outline-none placeholder:text-gray-500"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {utmError && <p className="text-red-400 text-sm">{utmError}</p>}
+
+              <button
+                onClick={doShorten}
+                disabled={utmLoading}
+                className="min-h-[44px] bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg font-semibold text-sm hover:scale-105 transition disabled:opacity-50"
+              >
+                {utmLoading ? "Shortening…" : "Shorten →"}
+              </button>
+            </div>
+
+            {/* Result */}
+            {utmResult && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-green-500/10 border border-green-400/20 rounded-xl p-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-400 mb-1">Your short link</p>
+                  <a
+                    href={utmResult}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-300 font-mono text-sm break-all hover:underline"
+                  >
+                    {utmResult}
+                  </a>
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <button
+                      onClick={copyUtmResult}
+                      className="px-4 py-1.5 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-xs text-green-300 transition"
+                    >
+                      {utmCopied ? "Copied!" : "Copy"}
+                    </button>
+                    <a
+                      href={`/dashboard/${utmResult.split("/").pop()}`}
+                      className="px-4 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-gray-300 transition"
+                    >
+                      View Analytics →
+                    </a>
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-xl shrink-0">
+                  <QRCodeCanvas value={utmResult} size={96} />
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
 
         {/* Search + Filters */}
         <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4">
