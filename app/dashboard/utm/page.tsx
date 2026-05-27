@@ -129,7 +129,7 @@ function buildUrl(
   };
 
   add("utm_source", source);
-  add("subsource", subsource);
+  add("utm_subsource", subsource);
   add("utm_medium", medium);
   add("utm_campaign", campaign);
   add("utm_term", term);
@@ -384,7 +384,7 @@ export default function UTMGeneratorPage() {
     setSaving(true);
     try {
       const allCustom = [
-        ...(subsource ? [{ key: "subsource", value: subsource }] : []),
+        ...(subsource ? [{ key: "utm_subsource", value: subsource }] : []),
         ...customParams.map(({ key, value }) => ({ key, value })),
       ];
       await fetch("/api/utm", {
@@ -451,7 +451,7 @@ export default function UTMGeneratorPage() {
     setCoupon(item.utmParams.coupon || "");
 
     const all = item.customParams || [];
-    const sub = all.find((cp) => cp.key === "subsource");
+    const sub = all.find((cp) => cp.key === "utm_subsource");
     setSubsource(sub?.value || "");
     setCustomParams(
       all
@@ -898,9 +898,9 @@ export default function UTMGeneratorPage() {
                                 {item.utmParams.utm_medium}
                               </span>
                             )}
-                            {item.customParams?.find((cp) => cp.key === "subsource") && (
+                            {item.customParams?.find((cp) => cp.key === "utm_subsource") && (
                               <span className="text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-300 rounded-full">
-                                {item.customParams.find((cp) => cp.key === "subsource")!.value}
+                                {item.customParams.find((cp) => cp.key === "utm_subsource")!.value}
                               </span>
                             )}
                           </div>
