@@ -47,31 +47,23 @@ interface HistoryItem {
 
 // ─── Option Lists ─────────────────────────────────────────────────────────────
 
-const SOURCE_OPTIONS = [
-  "youtube", "telegramint", "telegramext", "instagram", "appnotif",
-  "crm", "seo", "meta", "google", "yt_promote", "ig_boosting",
-  "crm_outbound", "crm_inbound",
-];
+const SOURCE_MAP: Record<string, { subsources: string[]; mediums: string[] }> = {
+  youtube:      { subsources: ["psci","pcom","psslc"], mediums: ["live","video","shorts","post","bio"] },
+  telegramint:  { subsources: ["pcom","psslc","pbpsci","pbpcom","pbpsslc"], mediums: ["live","video","shorts","loop","post","story","reel","carousel"] },
+  telegramext:  { subsources: ["pbpsci","pbpcom","pbpsslc"], mediums: ["loop","post","story","reel","carousel"] },
+  instagram:    { subsources: ["psslc"], mediums: ["shorts","post","bio","story","reel","carousel"] },
+  appnotif:     { subsources: ["psci","pcom","psslc"], mediums: ["popup","push","bio"] },
+  crm:          { subsources: [], mediums: ["inbound","outbound"] },
+  seo:          { subsources: ["sslc","pu1sci","pu2sci","pu1com","pu2com"], mediums: ["blog","landingpage"] },
+  meta:         { subsources: ["pscipu1","pscipu2","pcommpu1","pcommpu2","psslckannadamed","psslcenglishmed","pninth","pcomm","psci"], mediums: ["leadgenform","walkin","conversion","subscribe","app install","leadgenlandingpage","followus","live link","skippable_ad","not skippable_ad"] },
+  google:       { subsources: ["pscipu1","pscipu2","pcommpu1","pcommpu2"], mediums: ["leadgenform","walkin","conversion","subscribe"] },
+  yt_promote:   { subsources: ["pcommpu1","pcommpu2"], mediums: ["conversion","subscribe"] },
+  ig_boosting:  { subsources: ["pcommpu2"], mediums: ["subscribe"] },
+  crm_outbound: { subsources: ["bulk_offer_msg","live_reminder_msg","result_followup_msg","failed_payment_followup","buy_now_clicker_followup"], mediums: ["whatsapp_niaa","whatsapp_manual","echo","whatsapp_bulk"] },
+  crm_inbound:  { subsources: ["echo_inbound","niaa_reply","walkin_intent","direct_whatsapp_message"], mediums: ["whatsapp_niaa","whatsapp_manual","echo"] },
+};
 
-const SUBSOURCE_OPTIONS = [
-  "psci", "pcom", "psslc", "pbpsci", "pbpcom", "pbpsslc",
-  "pscipu1", "pscipu2", "pcommpu1", "pcommpu2",
-  "psslckannadamed", "psslcenglishmed", "pninth", "pcomm",
-  "bulk_offer_msg", "live_reminder_msg", "result_followup_msg",
-  "failed_payment_followup", "buy_now_clicker_followup",
-  "echo_inbound", "niaa_reply", "walkin_intent",
-  "direct_whatsapp_message", "sslc",
-  "pu1sci", "pu2sci", "pu1com", "pu2com",
-];
-
-const MEDIUM_OPTIONS = [
-  "live", "video", "shorts", "post", "bio", "story", "reel", "carousel",
-  "popup", "push", "inbound", "outbound", "leadgenform", "walkin",
-  "conversion", "subscribe", "app install", "leadgenlandingpage",
-  "followus", "live link", "skippable_ad", "not skippable_ad",
-  "whatsapp_niaa", "whatsapp_manual", "echo", "whatsapp_bulk",
-  "blog", "landingpage",
-];
+const SOURCE_OPTIONS = Object.keys(SOURCE_MAP);
 
 const CAMPAIGN_OPTIONS = [
   "sales", "puller", "academic", "loop", "Conversion",
@@ -281,6 +273,14 @@ export default function UTMGeneratorPage() {
   const [coupon, setCoupon]       = useState("");
   const [customParams, setCustomParams] = useState<CustomParam[]>([]);
   const [urlError, setUrlError]   = useState("");
+  const [subsourceError, setSubsourceError] = useState("");
+  const [formSubmitted, setFormSubmitted]   = useState(false);
+
+  // Derived cascading options
+  const sourceEntry       = source ? SOURCE_MAP[source] : null;
+  const availableSubsources = sourceEntry?.subsources ?? [];
+  const availableMediums    = sourceEntry?.mediums    ?? [];
+  const subsourceRequired   = !!source && availableSubsources.length > 0;
 
   // Output state
   const [copied, setCopied] = useState(false);
@@ -335,6 +335,14 @@ export default function UTMGeneratorPage() {
     [baseUrl, source, subsource, medium, campaign, term, content, utmId, coupon, customParams]
   );
 
+  // When source changes, reset subsource + medium and clear their errors
+  const handleSourceChange = useCallback((newSource: string) => {
+    setSource(newSource);
+    setSubsource("");
+    setMedium("");
+    setSubsourceError("");
+  }, []);
+
   // Base URL validation
   useEffect(() => {
     if (!baseUrl) { setUrlError(""); return; }
@@ -345,6 +353,12 @@ export default function UTMGeneratorPage() {
       setUrlError("Enter a valid URL (e.g. https://example.com)");
     }
   }, [baseUrl]);
+
+  // Subsource validation (only when form has been submitted)
+  useEffect(() => {
+    if (!formSubmitted) return;
+    setSubsourceError(subsourceRequired && !subsource ? "Sub Source is required" : "");
+  }, [subsource, subsourceRequired, formSubmitted]);
 
 
   // ── Custom params ────────────────────────────────────────────────────────────
@@ -491,7 +505,17 @@ export default function UTMGeneratorPage() {
   }
 
   const allPresets = [...BUILTIN_TEMPLATES, ...presets];
-  const isValid = !urlError && baseUrl.length > 0 && source && medium && campaign;
+  const subsourceValid = !subsourceRequired || !!subsource;
+  const isValid = !urlError && baseUrl.length > 0 && source && medium && campaign && subsourceValid;
+
+  const validateAndMark = () => {
+    setFormSubmitted(true);
+    if (subsourceRequired && !subsource) {
+      setSubsourceError("Sub Source is required");
+      return false;
+    }
+    return true;
+  };
 
   return (
     <main className="min-h-screen text-white relative overflow-hidden">
@@ -617,29 +641,34 @@ export default function UTMGeneratorPage() {
                   <Field label="utm_source" required>
                     <SearchableSelect
                       value={source}
-                      onChange={setSource}
+                      onChange={handleSourceChange}
                       options={SOURCE_OPTIONS}
                       placeholder="e.g. youtube, google, instagram…"
                     />
                   </Field>
 
-                  {/* Sub Source (new field) */}
-                  <Field label="Sub Source" optional>
-                    <SearchableSelect
-                      value={subsource}
-                      onChange={setSubsource}
-                      options={SUBSOURCE_OPTIONS}
-                      placeholder="e.g. psci, pcom, sslc…"
-                    />
-                  </Field>
+                  {/* Sub Source — hidden when source has no subsources */}
+                  {(!source || availableSubsources.length > 0) && (
+                    <Field label="Sub Source" required={subsourceRequired}>
+                      <SearchableSelect
+                        value={subsource}
+                        onChange={(v) => { setSubsource(v); if (v) setSubsourceError(""); }}
+                        options={availableSubsources}
+                        placeholder={source ? `e.g. ${availableSubsources[0] ?? "…"}` : "Select a source first…"}
+                      />
+                      {subsourceError && (
+                        <p className="text-red-400 text-xs mt-1">{subsourceError}</p>
+                      )}
+                    </Field>
+                  )}
 
                   {/* Medium */}
                   <Field label="utm_medium" required>
                     <SearchableSelect
                       value={medium}
                       onChange={setMedium}
-                      options={MEDIUM_OPTIONS}
-                      placeholder="e.g. live, reel, whatsapp_manual…"
+                      options={availableMediums}
+                      placeholder={source ? `e.g. ${availableMediums[0] ?? "…"}` : "Select a source first…"}
                     />
                   </Field>
 
@@ -760,7 +789,7 @@ export default function UTMGeneratorPage() {
 
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => copy(generatedUrl, setCopied)}
+                        onClick={() => { if (validateAndMark()) copy(generatedUrl, setCopied); }}
                         className="min-h-[40px] px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-sm font-medium hover:scale-105 transition"
                       >
                         {copied ? "Copied!" : "Copy Link"}
@@ -768,7 +797,7 @@ export default function UTMGeneratorPage() {
 
                       {isValid && (
                         <button
-                          onClick={goToShorten}
+                          onClick={() => { if (validateAndMark()) goToShorten(); }}
                           className="min-h-[40px] px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm transition"
                         >
                           Shorten this link →
@@ -777,7 +806,7 @@ export default function UTMGeneratorPage() {
 
                       {isValid && (
                         <button
-                          onClick={saveToHistory}
+                          onClick={() => { if (validateAndMark()) saveToHistory(); }}
                           disabled={saving}
                           className="min-h-[40px] px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-400/30 text-green-300 rounded-lg text-sm transition disabled:opacity-50"
                         >
