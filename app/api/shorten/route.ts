@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/db";
 import Link from "@/lib/models/Link";
 import { auth } from "@clerk/nextjs/server";
+import { getUserDomain } from "@/lib/domainMap";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -42,10 +43,12 @@ export async function POST(req: Request) {
 
   // ── 3. Auth (optional — guests allowed) ───────────────────────────────────
   let userId: string | null = null;
+  let shortDomain = "snsh.vercel.app";
   try {
     const authData = await auth();
     userId = authData.userId;
-    console.log("[shorten] Auth resolved, userId:", userId ?? "guest");
+    if (userId) shortDomain = getUserDomain(userId);
+    console.log("[shorten] Auth resolved, userId:", userId ?? "guest", "domain:", shortDomain);
   } catch (e) {
     console.log("[shorten] Auth skipped (guest):", e);
   }
@@ -112,7 +115,8 @@ export async function POST(req: Request) {
       folder: folder?.trim() || "",
     });
     console.log("[shorten] Saved successfully, _id:", newLink._id);
-    return Response.json({ data: newLink });
+    const shortUrl = `https://${shortDomain}/${shortCode}`;
+    return Response.json({ data: { ...newLink.toObject(), shortUrl } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const stack = e instanceof Error ? e.stack : undefined;
