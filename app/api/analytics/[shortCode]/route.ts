@@ -12,25 +12,35 @@ export async function GET(
   const { searchParams } = req.nextUrl;
 
   const page  = Math.max(1, parseInt(searchParams.get("page")  || "1",  10));
-  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
-  const skip  = (page - 1) * limit;
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get("limit") || "100", 10)));
 
-  // $slice on the projection reads only the requested window from MongoDB —
-  // the full clickHistory array is never loaded into memory.
-  const link = await Link.findOne(
-    { shortCode },
-    { clicks: 1, clickHistory: { $slice: [skip, limit] } }
-  );
+  // Single aggregation:
+  //   windowStart = max(0, clicks - page*limit)  → offset from array start
+  //   $slice the window, then $reverseArray       → newest-first output
+  //   hasMore = windowStart > 0                   → older entries exist
+  const [result] = await Link.aggregate([
+    { $match: { shortCode } },
+    {
+      $addFields: {
+        windowStart: { $max: [0, { $subtract: ["$clicks", page * limit] }] },
+      },
+    },
+    {
+      $project: {
+        totalClicks: "$clicks",
+        hasMore: { $gt: ["$windowStart", 0] },
+        data: { $reverseArray: { $slice: ["$clickHistory", "$windowStart", limit] } },
+      },
+    },
+  ]);
 
-  if (!link) {
+  if (!result) {
     return NextResponse.json({ error: "Link not found" }, { status: 404 });
   }
 
-  const history = link.clickHistory || [];
-
   return NextResponse.json({
-    totalClicks: link.clicks,
-    data: history,
-    pagination: { page, limit, hasMore: history.length === limit },
+    totalClicks: result.totalClicks,
+    data: result.data,
+    pagination: { page, limit, hasMore: result.hasMore },
   });
 }

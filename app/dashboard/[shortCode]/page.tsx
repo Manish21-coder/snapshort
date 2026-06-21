@@ -17,14 +17,13 @@ interface ClickEntry {
   ip: string;
 }
 
-interface LinkData {
+interface LinkMeta {
   _id: string;
   originalUrl: string;
   urls: string[];
   shortCode: string;
   folder: string;
   clicks: number;
-  clickHistory: ClickEntry[];
 }
 
 interface AnalyticsPageProps {
@@ -33,8 +32,12 @@ interface AnalyticsPageProps {
 
 export default function AnalyticsPage({ params }: AnalyticsPageProps) {
   const [shortCode, setShortCode] = useState("");
-  const [data, setData] = useState<LinkData | null>(null);
+  const [meta, setMeta] = useState<LinkMeta | null>(null);
+  const [clickHistory, setClickHistory] = useState<ClickEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     async function getParams() {
@@ -46,33 +49,49 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
 
   useEffect(() => {
     if (!shortCode) return;
-    fetch(`/api/links/${shortCode}`)
-      .then((r) => r.json())
-      .then((json) => {
-        setData(json.data);
+    // Fetch link metadata and first page of history in parallel
+    Promise.all([
+      fetch(`/api/links/${shortCode}`).then((r) => r.json()),
+      fetch(`/api/analytics/${shortCode}?page=1&limit=100`).then((r) => r.json()),
+    ])
+      .then(([linkJson, analyticsJson]) => {
+        setMeta(linkJson.data ?? null);
+        setClickHistory(analyticsJson.data || []);
+        setHasMoreHistory(analyticsJson.pagination?.hasMore ?? false);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [shortCode]);
 
-  // Aggregate click history by day for the chart
+  const loadMoreHistory = async () => {
+    setLoadingHistory(true);
+    const nextPage = historyPage + 1;
+    const res = await fetch(`/api/analytics/${shortCode}?page=${nextPage}&limit=100`);
+    const json = await res.json();
+    setClickHistory((prev) => [...prev, ...(json.data || [])]);
+    setHasMoreHistory(json.pagination?.hasMore ?? false);
+    setHistoryPage(nextPage);
+    setLoadingHistory(false);
+  };
+
+  // Aggregate loaded click history by day for the chart
   const chartData = useMemo(() => {
-    if (!data?.clickHistory?.length) return [];
+    if (!clickHistory.length) return [];
     const byDay: Record<string, number> = {};
-    for (const entry of data.clickHistory) {
+    for (const entry of clickHistory) {
       const day = entry.timestamp.slice(0, 10);
       byDay[day] = (byDay[day] || 0) + 1;
     }
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, clicks]) => ({ date, clicks }));
-  }, [data]);
+  }, [clickHistory]);
 
   // Top IPs as a proxy for referrers
   const topIPs = useMemo(() => {
-    if (!data?.clickHistory?.length) return [];
+    if (!clickHistory.length) return [];
     const counts: Record<string, number> = {};
-    for (const entry of data.clickHistory) {
+    for (const entry of clickHistory) {
       const key = entry.ip || "Unknown";
       counts[key] = (counts[key] || 0) + 1;
     }
@@ -80,17 +99,18 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([ip, count]) => ({ ip, count }));
-  }, [data]);
+  }, [clickHistory]);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   if (loading) return <p className="text-white text-center mt-20">Loading...</p>;
 
-  if (!data) {
+  if (!meta) {
     return <p className="text-white text-center mt-20">Link not found.</p>;
   }
 
-  const recentHistory = [...(data.clickHistory || [])].reverse().slice(0, 50);
+  // API returns newest-first; show up to 50 in the table
+  const recentHistory = clickHistory.slice(0, 50);
 
   return (
     <main className="min-h-screen text-white relative overflow-hidden">
@@ -109,24 +129,24 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
         <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-5 mb-6">
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Short link</p>
           <a
-            href={`${baseUrl}/${data.shortCode}`}
+            href={`${baseUrl}/${meta.shortCode}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-400 font-medium text-lg"
           >
-            {baseUrl}/{data.shortCode}
+            {baseUrl}/{meta.shortCode}
           </a>
 
           <p className="text-xs text-gray-500 uppercase tracking-wide mt-3 mb-1">Destination</p>
-          <p className="text-gray-300 text-sm break-all">{data.originalUrl}</p>
+          <p className="text-gray-300 text-sm break-all">{meta.originalUrl}</p>
 
-          {data.urls?.length > 0 && (
+          {meta.urls?.length > 0 && (
             <>
               <p className="text-xs text-gray-500 uppercase tracking-wide mt-3 mb-1">
                 Group URLs (round-robin)
               </p>
               <ul className="flex flex-col gap-1">
-                {data.urls.map((u, i) => (
+                {meta.urls.map((u, i) => (
                   <li key={i} className="text-gray-300 text-sm break-all">
                     {i + 1}. {u}
                   </li>
@@ -135,9 +155,9 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
             </>
           )}
 
-          {data.folder && (
+          {meta.folder && (
             <p className="text-xs text-gray-500 mt-3">
-              📁 {data.folder}
+              📁 {meta.folder}
             </p>
           )}
         </div>
@@ -145,7 +165,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
         {/* Total Clicks */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-5 text-center">
-            <p className="text-4xl font-bold text-blue-400">{data.clicks}</p>
+            <p className="text-4xl font-bold text-blue-400">{meta.clicks}</p>
             <p className="text-gray-400 text-sm mt-1">Total Clicks</p>
           </div>
           <div className="backdrop-blur-lg bg-white/10 border border-white/20 rounded-xl p-5 text-center">
@@ -235,7 +255,7 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
           <h2 className="text-lg font-semibold mb-4">
             Recent Clicks{" "}
             <span className="text-sm text-gray-500 font-normal">
-              (last {recentHistory.length})
+              (showing {clickHistory.length} of {meta.clicks})
             </span>
           </h2>
 
@@ -273,6 +293,18 @@ export default function AnalyticsPage({ params }: AnalyticsPageProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {hasMoreHistory && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={loadMoreHistory}
+                disabled={loadingHistory}
+                className="min-h-[44px] px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm transition disabled:opacity-50"
+              >
+                {loadingHistory ? "Loading…" : "Load older clicks"}
+              </button>
             </div>
           )}
         </div>

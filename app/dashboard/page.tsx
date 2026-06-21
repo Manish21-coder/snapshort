@@ -37,6 +37,11 @@ export default function Dashboard() {
   const [utmError, setUtmError]               = useState("");
   const [utmCopied, setUtmCopied]             = useState(false);
 
+  // Pagination state for the links list
+  const [linksPage, setLinksPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // Edit modal state
   const [editingLink, setEditingLink] = useState<LinkDoc | null>(null);
   const [editUrl, setEditUrl] = useState("");
@@ -48,11 +53,25 @@ export default function Dashboard() {
 
   const fetchLinks = async () => {
     setLoading(true);
-    const query = new URLSearchParams({ search, startDate, endDate });
+    setLinksPage(1);
+    const query = new URLSearchParams({ search, startDate, endDate, page: "1" });
     const res = await fetch(`/api/links?${query}`);
     const data = await res.json();
     setLinks(data.data || []);
+    setHasMore(data.pagination?.hasMore ?? false);
     setLoading(false);
+  };
+
+  const loadMoreLinks = async () => {
+    setLoadingMore(true);
+    const nextPage = linksPage + 1;
+    const query = new URLSearchParams({ search, startDate, endDate, page: String(nextPage) });
+    const res = await fetch(`/api/links?${query}`);
+    const data = await res.json();
+    setLinks((prev) => [...prev, ...(data.data || [])]);
+    setHasMore(data.pagination?.hasMore ?? false);
+    setLinksPage(nextPage);
+    setLoadingMore(false);
   };
 
   const fetchFolders = async () => {
@@ -362,8 +381,7 @@ export default function Dashboard() {
         {!loading && links.length === 0 && <p className="text-gray-400">No links found.</p>}
 
         {/* Links grouped by folder */}
-        {!loading &&
-          folderOrder.map((folderName) => (
+        {!loading && folderOrder.map((folderName) => (
             <div key={folderName} className="mb-8">
               <h2 className="text-lg font-semibold text-gray-300 mb-3 flex items-center gap-2">
                 📁 {folderName}
@@ -417,7 +435,20 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-          ))}
+        ))}
+
+        {/* Load more */}
+        {!loading && hasMore && (
+          <div className="flex justify-center mt-2 mb-4">
+            <button
+              onClick={loadMoreLinks}
+              disabled={loadingMore}
+              className="min-h-[44px] px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium transition disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}
