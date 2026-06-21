@@ -67,60 +67,55 @@ export async function POST(req: Request) {
     );
   }
 
-  // ── 5. Resolve shortCode ───────────────────────────────────────────────────
-  let shortCode: string | undefined;
-
+  // ── 5 & 6. Resolve shortCode + Save ───────────────────────────────────────
+  // Alias: check existence first to return a clear error, then insert once.
+  // Random: attempt Link.create() directly; catch duplicate-key (code 11000)
+  //         and retry with a new random suffix — 1 DB write in the common case,
+  //         no pre-flight reads needed.
   try {
     if (alias) {
-      shortCode = alias.trim().toLowerCase().replace(/[^a-z0-9\-]/g, "");
+      const shortCode = alias.trim().toLowerCase().replace(/[^a-z0-9\-]/g, "");
       console.log("[shorten] Using alias shortCode:", shortCode);
       const exists = await Link.findOne({ shortCode });
       if (exists) {
         console.warn("[shorten] Alias already exists:", shortCode);
         return Response.json({ error: "Alias already exists" }, { status: 400 });
       }
+      const newLink = await Link.create({
+        originalUrl, shortCode, userId: userId || null, folder: folder?.trim() || "",
+      });
+      console.log("[shorten] Saved alias link, _id:", newLink._id);
+      const shortUrl = `https://${shortDomain}/${shortCode}`;
+      return Response.json({ data: { ...newLink.toObject(), shortUrl } });
+
     } else {
       const cleanPrefix =
         prefix?.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || "mani";
       console.log("[shorten] Generating shortCode with prefix:", cleanPrefix);
 
-      let exists = true;
-      let attempts = 0;
-      while (exists) {
-        const randomPart = Math.random().toString(36).substring(2, 6);
-        shortCode = `${cleanPrefix}-${randomPart}`;
-        const existing = await Link.findOne({ shortCode });
-        if (!existing) exists = false;
-        attempts++;
-        if (attempts > 20) throw new Error("Could not generate unique shortCode after 20 attempts");
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const shortCode = `${cleanPrefix}-${Math.random().toString(36).substring(2, 6)}`;
+        try {
+          const newLink = await Link.create({
+            originalUrl, shortCode, userId: userId || null, folder: folder?.trim() || "",
+          });
+          console.log("[shorten] Saved link, shortCode:", shortCode, "attempt:", attempt + 1);
+          const shortUrl = `https://${shortDomain}/${shortCode}`;
+          return Response.json({ data: { ...newLink.toObject(), shortUrl } });
+        } catch (e: any) {
+          if (e?.code === 11000) {
+            console.log("[shorten] Collision on", shortCode, "retrying…");
+            continue;
+          }
+          throw e;
+        }
       }
-      console.log("[shorten] Generated unique shortCode:", shortCode, "after", "attempts");
+      throw new Error("Could not generate unique shortCode after 20 attempts");
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[shorten] shortCode resolution error:", msg);
-    return Response.json(
-      { error: "Failed to generate short code", ...(isDev && { detail: msg }) },
-      { status: 500 }
-    );
-  }
-
-  // ── 6. Save to DB ──────────────────────────────────────────────────────────
-  try {
-    console.log("[shorten] Saving link:", { originalUrl, shortCode, userId, folder });
-    const newLink = await Link.create({
-      originalUrl,
-      shortCode,
-      userId: userId || null,
-      folder: folder?.trim() || "",
-    });
-    console.log("[shorten] Saved successfully, _id:", newLink._id);
-    const shortUrl = `https://${shortDomain}/${shortCode}`;
-    return Response.json({ data: { ...newLink.toObject(), shortUrl } });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
     const stack = e instanceof Error ? e.stack : undefined;
-    console.error("[shorten] DB save error:", msg);
+    console.error("[shorten] error:", msg);
     if (stack) console.error("[shorten] Stack:", stack);
     return Response.json(
       { error: "Failed to save link", ...(isDev && { detail: msg }) },

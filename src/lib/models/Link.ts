@@ -19,6 +19,10 @@ const LinkSchema = new Schema(
   { timestamps: true }
 );
 
+// Speeds up the distinct("folder") query in /api/folders and any
+// userId-scoped list queries that sort by folder.
+LinkSchema.index({ userId: 1, folder: 1 });
+
 const Link = models.Link || model("Link", LinkSchema);
 
 export default Link;

@@ -19,9 +19,14 @@ export async function GET(
 ) {
   try {
     await connectDB();
+    const { userId } = await auth();
     const { shortCode } = await context.params;
 
-    const link = await Link.findOne({ shortCode });
+    // userId filter ensures a user can only fetch their own link.
+    // Return 404 (not 403) so we don't reveal whether the shortCode exists.
+    if (!userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const link = await Link.findOne({ shortCode, userId });
     if (!link) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     return NextResponse.json({ data: link });
