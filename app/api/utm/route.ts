@@ -1,6 +1,8 @@
 import { connectDB } from "@/lib/db";
 import UTMLink from "@/lib/models/UTMLink";
 import { auth } from "@clerk/nextjs/server";
+import { SOURCE_MAP } from "@/lib/sourceMap";
+import { PARIKSHE_USER_ID } from "@/lib/domainMap";
 
 export async function POST(req: Request) {
   try {
@@ -13,6 +15,37 @@ export async function POST(req: Request) {
 
     if (!baseUrl || !finalUrl) {
       return Response.json({ error: "baseUrl and finalUrl are required" }, { status: 400 });
+    }
+
+    // Restricted user: utm_source, subsource, and utm_medium must be valid SOURCE_MAP values.
+    // All other users skip this block entirely — their submission is unchanged.
+    if (userId === PARIKSHE_USER_ID) {
+      const utm_source = utmParams?.utm_source ?? "";
+      const utm_medium = utmParams?.utm_medium ?? "";
+      const subsourceParam = (customParams ?? []).find(
+        (cp: { key: string; value: string }) => cp.key === "utm_subsource"
+      );
+      const subsource = subsourceParam?.value ?? "";
+
+      const mapEntry = SOURCE_MAP[utm_source];
+      if (!mapEntry) {
+        return Response.json(
+          { error: `Invalid utm_source: "${utm_source}" is not in the allowed list` },
+          { status: 400 }
+        );
+      }
+      if (mapEntry.subsources.length > 0 && !mapEntry.subsources.includes(subsource)) {
+        return Response.json(
+          { error: `Invalid subsource: "${subsource}" is not valid for source "${utm_source}"` },
+          { status: 400 }
+        );
+      }
+      if (!mapEntry.mediums.includes(utm_medium)) {
+        return Response.json(
+          { error: `Invalid utm_medium: "${utm_medium}" is not valid for source "${utm_source}"` },
+          { status: 400 }
+        );
+      }
     }
 
     const doc = await UTMLink.create({

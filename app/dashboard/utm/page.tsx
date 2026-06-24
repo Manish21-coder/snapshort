@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, SignInButton } from "@clerk/nextjs";
+import { SOURCE_MAP, SOURCE_OPTIONS } from "@/lib/sourceMap";
+import { PARIKSHE_USER_ID } from "@/lib/domainMap";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,24 +48,6 @@ interface HistoryItem {
 }
 
 // ─── Option Lists ─────────────────────────────────────────────────────────────
-
-const SOURCE_MAP: Record<string, { subsources: string[]; mediums: string[] }> = {
-  youtube:      { subsources: ["psci","pcom","psslc"], mediums: ["live","video","shorts","post","bio"] },
-  telegramint:  { subsources: ["pcom","psslc","pbpsci","pbpcom","pbpsslc"], mediums: ["live","video","shorts","loop","post","story","reel","carousel"] },
-  telegramext:  { subsources: ["pbpsci","pbpcom","pbpsslc"], mediums: ["loop","post","story","reel","carousel"] },
-  instagram:    { subsources: ["psslc"], mediums: ["shorts","post","bio","story","reel","carousel"] },
-  appnotif:     { subsources: ["psci","pcom","psslc"], mediums: ["popup","push","bio"] },
-  crm:          { subsources: [], mediums: ["inbound","outbound"] },
-  seo:          { subsources: ["sslc","pu1sci","pu2sci","pu1com","pu2com"], mediums: ["blog","landingpage"] },
-  meta:         { subsources: ["pscipu1","pscipu2","pcommpu1","pcommpu2","psslckannadamed","psslcenglishmed","pninth","pcomm","psci"], mediums: ["leadgenform","walkin","conversion","subscribe","app install","leadgenlandingpage","followus","live link","skippable_ad","not skippable_ad"] },
-  google:       { subsources: ["pscipu1","pscipu2","pcommpu1","pcommpu2"], mediums: ["leadgenform","walkin","conversion","subscribe"] },
-  yt_promote:   { subsources: ["pcommpu1","pcommpu2"], mediums: ["conversion","subscribe"] },
-  ig_boosting:  { subsources: ["pcommpu2"], mediums: ["subscribe"] },
-  crm_outbound: { subsources: ["bulk_offer_msg","live_reminder_msg","result_followup_msg","failed_payment_followup","buy_now_clicker_followup"], mediums: ["whatsapp_niaa","whatsapp_manual","echo","whatsapp_bulk"] },
-  crm_inbound:  { subsources: ["echo_inbound","niaa_reply","walkin_intent","direct_whatsapp_message"], mediums: ["whatsapp_niaa","whatsapp_manual","echo"] },
-};
-
-const SOURCE_OPTIONS = Object.keys(SOURCE_MAP);
 
 const CAMPAIGN_OPTIONS = [
   "sales", "puller", "academic", "loop", "Conversion",
@@ -230,6 +214,43 @@ function SearchableSelect({
   );
 }
 
+// ─── StrictSelect ─────────────────────────────────────────────────────────────
+// Dropdown-only select (no free-text) for the restricted user.
+
+function StrictSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 pr-8 text-white text-sm outline-none focus:border-white/40 transition"
+      >
+        <option value="" disabled className="bg-gray-900 text-gray-500">
+          {placeholder ?? "Select…"}
+        </option>
+        {options.map((opt) => (
+          <option key={opt} value={opt} className="bg-gray-900">
+            {opt}
+          </option>
+        ))}
+      </select>
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none select-none">
+        ▾
+      </span>
+    </div>
+  );
+}
+
 // ─── Field wrapper ─────────────────────────────────────────────────────────────
 
 function Field({
@@ -258,7 +279,8 @@ function Field({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function UTMGeneratorPage() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
+  const isRestrictedUser = user?.id === PARIKSHE_USER_ID;
   const router = useRouter();
 
   // Form state
@@ -639,23 +661,41 @@ export default function UTMGeneratorPage() {
 
                   {/* Source */}
                   <Field label="utm_source" required>
-                    <SearchableSelect
-                      value={source}
-                      onChange={handleSourceChange}
-                      options={SOURCE_OPTIONS}
-                      placeholder="e.g. youtube, google, instagram…"
-                    />
+                    {isRestrictedUser ? (
+                      <StrictSelect
+                        value={source}
+                        onChange={handleSourceChange}
+                        options={SOURCE_OPTIONS}
+                        placeholder="e.g. youtube, google, instagram…"
+                      />
+                    ) : (
+                      <SearchableSelect
+                        value={source}
+                        onChange={handleSourceChange}
+                        options={SOURCE_OPTIONS}
+                        placeholder="e.g. youtube, google, instagram…"
+                      />
+                    )}
                   </Field>
 
                   {/* Sub Source — hidden when source has no subsources */}
                   {(!source || availableSubsources.length > 0) && (
-                    <Field label="Sub Source" required={subsourceRequired}>
-                      <SearchableSelect
-                        value={subsource}
-                        onChange={(v) => { setSubsource(v); if (v) setSubsourceError(""); }}
-                        options={availableSubsources}
-                        placeholder={source ? `e.g. ${availableSubsources[0] ?? "…"}` : "Select a source first…"}
-                      />
+                    <Field label="Sub Source" required>
+                      {isRestrictedUser ? (
+                        <StrictSelect
+                          value={subsource}
+                          onChange={(v) => { setSubsource(v); if (v) setSubsourceError(""); }}
+                          options={availableSubsources}
+                          placeholder={source ? `e.g. ${availableSubsources[0] ?? "…"}` : "Select a source first…"}
+                        />
+                      ) : (
+                        <SearchableSelect
+                          value={subsource}
+                          onChange={(v) => { setSubsource(v); if (v) setSubsourceError(""); }}
+                          options={availableSubsources}
+                          placeholder={source ? `e.g. ${availableSubsources[0] ?? "…"}` : "Select a source first…"}
+                        />
+                      )}
                       {subsourceError && (
                         <p className="text-red-400 text-xs mt-1">{subsourceError}</p>
                       )}
@@ -664,12 +704,21 @@ export default function UTMGeneratorPage() {
 
                   {/* Medium */}
                   <Field label="utm_medium" required>
-                    <SearchableSelect
-                      value={medium}
-                      onChange={setMedium}
-                      options={availableMediums}
-                      placeholder={source ? `e.g. ${availableMediums[0] ?? "…"}` : "Select a source first…"}
-                    />
+                    {isRestrictedUser ? (
+                      <StrictSelect
+                        value={medium}
+                        onChange={setMedium}
+                        options={availableMediums}
+                        placeholder={source ? `e.g. ${availableMediums[0] ?? "…"}` : "Select a source first…"}
+                      />
+                    ) : (
+                      <SearchableSelect
+                        value={medium}
+                        onChange={setMedium}
+                        options={availableMediums}
+                        placeholder={source ? `e.g. ${availableMediums[0] ?? "…"}` : "Select a source first…"}
+                      />
+                    )}
                   </Field>
 
                   {/* Campaign */}
